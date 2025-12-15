@@ -15,7 +15,8 @@ spec:
       labels:
         app: retail-backend
     spec:
-      serviceAccountName: retail
+      imagePullSecrets:
+        - name: dockerhub-secret
       containers:
         - name: backend
           image: docker.io/technologybuildingblocks/retail-backend:1.0.0

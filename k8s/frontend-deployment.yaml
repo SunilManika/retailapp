@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: retail-frontend
-  namespace: tbb  
+  namespace: tbb
   labels:
     app: retail-frontend
 spec:
@@ -16,6 +16,8 @@ spec:
         app: retail-frontend
     spec:
       serviceAccountName: retail
+      imagePullSecrets:
+        - name: dockerhub-secret
       containers:
         - name: frontend
           image: docker.io/technologybuildingblocks/retail-frontend:1.0.0
@@ -24,11 +26,11 @@ spec:
             - containerPort: 80
           resources:
             requests:
-              cpu: "50m"      # Low guaranteed CPU for easy saturation
-              memory: "128Mi" # Low memory to show upward trend
+              cpu: "50m"
+              memory: "128Mi"
             limits:
-              cpu: "300m"     # Moderate limit to show CPU throttling
-              memory: "512Mi" # Enough to avoid OOM but show growth
+              cpu: "300m"
+              memory: "512Mi"
           readinessProbe:
             httpGet:
               path: /
@@ -41,4 +43,3 @@ spec:
               port: 8080
             initialDelaySeconds: 10
             periodSeconds: 20
-
