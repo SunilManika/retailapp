@@ -36,17 +36,17 @@ Before running the deployment script, ensure the following:
   -----------------------------------------------------------------------
   Requirement                        Description
   ---------------------------------- ------------------------------------
-  Root access                        Script must be executed as root.
+  - Root access                        Script must be executed as root.
 
-  Docker Hub account                 Username and password/token needed
+  - Docker Hub account                 Username and password/token needed
                                      for pushing images.
 
-  OpenShift access                   `oc login` token and API server
+  - OpenShift access                   `oc login` token and API server
                                      endpoint.
 
-  OpenShift version                  Tested with OpenShift **4.18.x**.
+  - OpenShift version                  Tested with OpenShift **4.18.x**.
 
-  Internet access                    Required to download tools and
+  - Internet access                    Required to download tools and
                                      GitHub source repo.
   -----------------------------------------------------------------------
 
