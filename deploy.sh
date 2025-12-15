@@ -1,286 +1,216 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-########################################
-# GLOBAL VARIABLES
-########################################
+## Input Parameters
 OC_TOKEN="${1:-}"
 OC_SERVER="${2:-}"
 DOCKER_USERNAME="${3:-}"
 DOCKER_PASSWORD="${4:-}"
 
+[[ -z "$OC_TOKEN" || -z "$OC_SERVER" || -z "$DOCKER_USERNAME" || -z "$DOCKER_PASSWORD" ]] && \
+    { echo "Usage: $0 <OC_TOKEN> <OC_SERVER> <DOCKER_USERNAME> <DOCKER_PASSWORD>"; exit 1; }
+
+[[ $EUID -ne 0 ]] && { echo "This script must be run as root."; exit 1; }
+
 OPENSHIFT_VERSION="4.18.28"
 JMETER_VERSION="5.6.3"
 
+NAMESPACE="tbb"
+POSTGRES_LABEL="app=retail-postgres"
+
 BACKEND_IMAGE="docker.io/${DOCKER_USERNAME}/retail-backend:1.0.0"
 FRONTEND_IMAGE="docker.io/${DOCKER_USERNAME}/retail-frontend:1.0.0"
+
 GITHUB_ZIP_URL="https://github.com/SunilManika/retailapp/archive/refs/heads/main.zip"
-POSTGRES_LABEL="app=retail-postgres"
-NAMESPACE="tbb"
 
 JMETER_INSTALL_DIR="/opt/jmeter"
 JMETER_HOME="${JMETER_INSTALL_DIR}/apache-jmeter-${JMETER_VERSION}"
 
 ########################################
-# LOGGING FUNCTIONS
-########################################
 step()  { echo; echo "---- $* ----"; }
-info()  { echo "[INFO]  $*"; }
-error() { echo "[ERROR] $*" >&2; exit 1; }
+info()  { echo "[INFO] $*"; }
+fail()  { echo "[ERROR] $*" >&2; exit 1; }
 
-########################################
-# COMMAND EXECUTION WRAPPER
 ########################################
 run_cmd() {
-    local description="$1"
-    shift
-    local cmd="$*"
-
+    description="$1"; shift
     info "$description"
-    if ! output=$(eval "$cmd" 2>&1); then
+    if ! output=$(eval "$*" 2>&1); then
         echo
-        error "FAILED: $description"
-        echo "-------- FAILURE OUTPUT --------"
+        echo "[FAILED] $description"
+        echo "----- ERROR OUTPUT -----"
         echo "$output"
-        echo "--------------------------------"
+        echo "------------------------"
         exit 1
     fi
 }
 
 ########################################
-# SPINNER
-########################################
 spinner() {
-    local pid=$1
-    local delay=0.15
-    local spinstr='|/-\'
-    echo -n " "
-    while ps -p $pid > /dev/null 2>&1; do
-        local temp=${spinstr#?}
-        printf " [%c]  " "$spinstr"
-        spinstr=$temp${spinstr%"$temp"}
-        sleep $delay
+    local pid=$1 delay=0.15 spin='|/-\'
+    while ps -p "$pid" > /dev/null 2>&1; do
+        printf " [%c]  " "$spin"
+        spin=${spin#?}${spin%${spin#?}}
+        sleep "$delay"
         printf "\b\b\b\b\b\b"
     done
-    printf "     \b\b\b\b\b"
+    printf "      \b\b\b\b\b"
 }
 
 ########################################
-# INPUT VALIDATION
-########################################
-[[ -z "$OC_TOKEN" || -z "$OC_SERVER" || -z "$DOCKER_USERNAME" || -z "$DOCKER_PASSWORD" ]] && \
-    error "Usage: $0 <OC_TOKEN> <OC_SERVER> <DOCKER_USERNAME> <DOCKER_PASSWORD>"
 
-[[ $EUID -ne 0 ]] && \
-    error "This script must be run as root."
+install_prereqs() {
+    step "Installing prerequisites"
+    run_cmd "Installing unzip, podman, Java 11" \
+        "yum -y -q install unzip podman java-11-openjdk"
+}
 
-########################################
-# 1. INSTALL PREREQUISITES
-########################################
-step "Installing prerequisites"
-run_cmd "Installing unzip, podman, and JDK" \
-    "yum -y -q install unzip podman java-11-openjdk"
+install_oc_cli() {
+    step "Installing OpenShift CLI"
+    run_cmd "Downloading oc CLI" \
+        "wget -q https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/${OPENSHIFT_VERSION}/openshift-client-linux-${OPENSHIFT_VERSION}.tar.gz"
+    run_cmd "Extracting oc CLI" "tar -xzf openshift-client-linux-${OPENSHIFT_VERSION}.tar.gz"
+    run_cmd "Moving oc binaries" "mv oc kubectl /usr/local/bin/"
+}
 
-########################################
-# 2. INSTALL OC CLI
-########################################
-step "Installing OpenShift CLI"
-run_cmd "Downloading OpenShift CLI ${OPENSHIFT_VERSION}" \
-    "wget -q https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/${OPENSHIFT_VERSION}/openshift-client-linux-${OPENSHIFT_VERSION}.tar.gz"
+install_jmeter() {
+    step "Installing JMeter $JMETER_VERSION"
+    mkdir -p "$JMETER_INSTALL_DIR"
+    cd "$JMETER_INSTALL_DIR"
+    run_cmd "Downloading JMeter" \
+        "wget -q https://dlcdn.apache.org/jmeter/binaries/apache-jmeter-${JMETER_VERSION}.zip"
+    run_cmd "Unzipping JMeter" "unzip -qo apache-jmeter-${JMETER_VERSION}.zip"
+    export JMETER_HOME PATH="$JMETER_HOME/bin:$PATH"
+}
 
-run_cmd "Extracting OpenShift CLI" \
-    "tar -xzf openshift-client-linux-${OPENSHIFT_VERSION}.tar.gz"
+download_application() {
+    step "Downloading application source"
+    cd /root
+    run_cmd "Downloading retailapp ZIP" "wget -q $GITHUB_ZIP_URL -O main.zip"
+    run_cmd "Unzipping repo" "unzip -qo main.zip"
+}
 
-run_cmd "Moving OC binaries" \
-    "mv oc kubectl /usr/local/bin/"
+update_yaml_images() {
+    step "Updating YAMLs with Docker username"
+    sed -i "s/technologybuildingblocks/${DOCKER_USERNAME}/g" k8s/frontend-deployment.yaml
+    sed -i "s/technologybuildingblocks/${DOCKER_USERNAME}/g" k8s/backend-deployment.yaml
+}
 
-########################################
-# 3. INSTALL JMETER
-########################################
-step "Installing JMeter ${JMETER_VERSION}"
+oc_login() {
+    step "Logging into OpenShift"
+    run_cmd "oc login" \
+        "oc login --token=$OC_TOKEN --server=$OC_SERVER"
+}
 
-run_cmd "Creating JMeter install directory" \
-    "mkdir -p $JMETER_INSTALL_DIR"
+create_docker_secret() {
+    step "Creating Docker registry pull secret"
+    run_cmd "Creating dockerhub-secret" \
+        "oc create secret docker-registry dockerhub-secret \
+            --docker-server=docker.io \
+            --docker-username=$DOCKER_USERNAME \
+            --docker-password=$DOCKER_PASSWORD \
+            --docker-email=test123@test.com \
+            -n $NAMESPACE || true"
+}
 
-cd "$JMETER_INSTALL_DIR"
+build_and_push_backend() {
+    step "Building backend image"
+    cd backend/
+    run_cmd "Build backend" "podman build -t $BACKEND_IMAGE . > /dev/null"
+    run_cmd "Push backend"  "podman push $BACKEND_IMAGE > /dev/null"
+}
 
-run_cmd "Downloading JMeter" \
-    "wget -q https://dlcdn.apache.org/jmeter/binaries/apache-jmeter-${JMETER_VERSION}.zip"
+build_and_push_frontend_initial() {
+    step "Building initial frontend image"
+    cd ../frontend/
+    run_cmd "Build frontend (initial)" \
+        "podman build -t $FRONTEND_IMAGE --build-arg VITE_API_BASE_URL='' . > /dev/null"
+    run_cmd "Push frontend (initial)" "podman push $FRONTEND_IMAGE > /dev/null"
+}
 
-run_cmd "Unzipping JMeter" \
-    "unzip -qo apache-jmeter-${JMETER_VERSION}.zip"
+prepare_namespace() {
+    step "Creating namespace and applying SCC"
+    run_cmd "Apply namespace" "oc apply -f ~/retailapp-main/k8s/namespace.yaml"
+    run_cmd "Apply SCC to service account" \
+        "oc adm policy add-scc-to-user anyuid -z tbb -n $NAMESPACE"
+}
 
-export JMETER_HOME="$JMETER_HOME"
-export PATH="$JMETER_HOME/bin:$PATH"
+deploy_manifests() {
+    step "Applying Kubernetes manifests"
+    run_cmd "oc apply" "oc apply -f ~/retailapp-main/k8s/"
+}
 
-########################################
-# 4. DOWNLOAD APPLICATION CODE
-########################################
-step "Downloading application source"
+rebuild_frontend_with_route() {
+    step "Fetching backend route"
+    BACKEND_ROUTE=$(oc get route -n "$NAMESPACE" | grep retail-backend | awk '{print $2}' || true)
+    [[ -z "$BACKEND_ROUTE" ]] && fail "Could not retrieve backend route."
+    info "Backend route: $BACKEND_ROUTE"
 
-cd /root
-run_cmd "Downloading retailapp repo ZIP" \
-    "wget -q $GITHUB_ZIP_URL -O main.zip"
+    step "Rebuilding frontend image with backend route"
+    cd ../frontend/
+    run_cmd "Build frontend (final)" \
+        "podman build -t $FRONTEND_IMAGE --build-arg VITE_API_BASE_URL=https://$BACKEND_ROUTE/api . > /dev/null"
+    run_cmd "Push frontend (final)" "podman push $FRONTEND_IMAGE > /dev/null"
+}
 
-run_cmd "Unzipping repo" \
-    "unzip -qo main.zip"
+restart_deployments() {
+    step "Restarting deployments"
 
-APP_DIR="/root/retailapp-main"
-cd "$APP_DIR"
+    info "Restarting backend"
+    oc rollout restart deployment/retail-backend -n "$NAMESPACE" > /dev/null
+    (oc rollout status deployment/retail-backend -n "$NAMESPACE" > /dev/null) & spinner $!
 
-########################################
-# 4A. UPDATE YAMLs WITH USER'S DOCKER USERNAME
-########################################
-step "Updating Kubernetes YAMLs with Docker username"
+    info "Restarting frontend"
+    oc rollout restart deployment/retail-frontend -n "$NAMESPACE" > /dev/null
+    (oc rollout status deployment/retail-frontend -n "$NAMESPACE" > /dev/null) & spinner $!
+}
 
-run_cmd "Updating frontend-deployment.yaml" \
-    "sed -i \"s/technologybuildingblocks/${DOCKER_USERNAME}/g\" k8s/frontend-deployment.yaml"
+load_database() {
+    step "Loading database"
 
-run_cmd "Updating backend-deployment.yaml" \
-    "sed -i \"s/technologybuildingblocks/${DOCKER_USERNAME}/g\" k8s/backend-deployment.yaml"
+    cd /root/retailapp-main
 
-########################################
-# 5. REGISTRY LOGIN
-########################################
-step "Logging into Docker registry"
+    info "Locating PostgreSQL pod..."
+    for _ in {1..10}; do
+        POD=$(oc get pod -n "$NAMESPACE" -l "$POSTGRES_LABEL" -o jsonpath='{.items[0].metadata.name}' || true)
+        [[ -n "$POD" ]] && break
+        sleep 5
+    done
+
+    [[ -z "$POD" ]] && fail "PostgreSQL pod not found."
+    info "PostgreSQL pod: $POD"
+
+    run_cmd "Copy SQL dump" \
+        "oc cp db/full_dump.sql -n $NAMESPACE $POD:/tmp/full_dump.sql"
+
+    run_cmd "Import database" \
+        "oc exec -n $NAMESPACE $POD -- bash -c 'psql -U retail_user -d retaildb < /tmp/full_dump.sql'"
+}
+
+# MAIN SCRIPT EXECUTION
+install_prereqs
+install_oc_cli
+install_jmeter
+
+download_application
+cd /root/retailapp-main
+update_yaml_images
 
 run_cmd "Podman login" \
     "podman login -u ${DOCKER_USERNAME} -p '${DOCKER_PASSWORD}' docker.io"
 
-########################################
-# 6. BUILD BACKEND IMAGE
-########################################
-step "Building backend image"
+build_and_push_backend
+build_and_push_frontend_initial
 
-cd backend/
-run_cmd "Building backend image" \
-    "podman build -t $BACKEND_IMAGE . > /dev/null"
+oc_login
+create_docker_secret
 
-run_cmd "Pushing backend image" \
-    "podman push $BACKEND_IMAGE > /dev/null"
+prepare_namespace
+deploy_manifests
 
-########################################
-# 7. BUILD FRONTEND IMAGE (INITIAL)
-########################################
-step "Building frontend image (initial)"
+rebuild_frontend_with_route
+restart_deployments
+load_database
 
-cd ../frontend/
-run_cmd "Building initial frontend image" \
-    "podman build -t $FRONTEND_IMAGE --build-arg VITE_API_BASE_URL='' . > /dev/null"
-
-run_cmd "Pushing initial frontend image" \
-    "podman push $FRONTEND_IMAGE > /dev/null"
-
-########################################
-# 8. LOGIN TO OPENSHIFT
-########################################
-step "Logging into OpenShift cluster"
-
-run_cmd "oc login" \
-    "oc login --token=$OC_TOKEN --server=$OC_SERVER"
-
-########################################
-# 8A. CREATE DOCKER REGISTRY SECRET
-########################################
-step "Creating Docker registry secret for image pulls"
-
-run_cmd "Creating dockerhub-secret" \
-    "oc create secret docker-registry dockerhub-secret \
-        --docker-server=docker.io \
-        --docker-username=$DOCKER_USERNAME \
-        --docker-password=$DOCKER_PASSWORD \
-        --docker-email=test123@test.com \
-        -n $NAMESPACE || true"
-
-########################################
-# 9. CREATE NAMESPACE & APPLY SCC
-########################################
-step "Creating namespace and SCC"
-
-run_cmd "Applying namespace" \
-    "oc apply -f $APP_DIR/k8s/namespace.yaml"
-
-run_cmd "Assigning SCC anyuid" \
-    "oc adm policy add-scc-to-user anyuid -z tbb -n $NAMESPACE"
-
-########################################
-# 10. APPLY MANIFESTS
-########################################
-step "Deploying Kubernetes manifests"
-
-run_cmd "oc apply all manifests" \
-    "oc apply -f $APP_DIR/k8s/"
-
-########################################
-# 11. GET BACKEND ROUTE & REBUILD FRONTEND
-########################################
-step "Fetching backend route"
-
-BACKEND_ROUTE=$(oc get route -n "$NAMESPACE" 2>/dev/null | grep retail-backend | awk '{print $2}' || true)
-
-[[ -z "$BACKEND_ROUTE" ]] && error "Failed to retrieve backend route."
-
-info "Backend route detected: $BACKEND_ROUTE"
-
-step "Rebuilding frontend with backend route"
-
-cd ../frontend/
-run_cmd "Rebuilding frontend image" \
-    "podman build -t $FRONTEND_IMAGE --build-arg VITE_API_BASE_URL=https://$BACKEND_ROUTE/api . > /dev/null"
-
-run_cmd "Pushing rebuilt frontend image" \
-    "podman push $FRONTEND_IMAGE > /dev/null"
-
-########################################
-# 12. ROLLOUT RESTART DEPLOYMENTS
-########################################
-step "ROLLING OUT UPDATED DEPLOYMENTS"
-
-info "Restarting backend deployment..."
-oc rollout restart deployment/retail-backend -n "$NAMESPACE" > /dev/null
-(
-    oc rollout status deployment/retail-backend -n "$NAMESPACE" > /dev/null
-) &
-spinner $!
-
-info "Restarting frontend deployment..."
-oc rollout restart deployment/retail-frontend -n "$NAMESPACE" > /dev/null
-(
-    oc rollout status deployment/retail-frontend -n "$NAMESPACE" > /dev/null
-) &
-spinner $!
-
-########################################
-# 13. LOAD DATABASE
-########################################
-step "Loading database"
-
-cd "$APP_DIR"
-
-info "Searching for PostgreSQL pod..."
-
-POD=""
-for i in {1..10}; do
-    POD=$(oc get pod -n "$NAMESPACE" -l "$POSTGRES_LABEL" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
-    [[ -n "$POD" ]] && break
-    info "Waiting for PostgreSQL pod..."
-    sleep 5
-done
-
-[[ -z "$POD" ]] && error "PostgreSQL pod not found."
-
-info "PostgreSQL pod found: $POD"
-
-run_cmd "Copying SQL dump into pod" \
-    "oc cp db/full_dump.sql -n $NAMESPACE $POD:/tmp/full_dump.sql"
-
-run_cmd "Executing SQL import" \
-    "oc exec -n $NAMESPACE $POD -- bash -c 'psql -U retail_user -d retaildb < /tmp/full_dump.sql'"
-
-########################################
-# COMPLETE
-########################################
 step "Deployment completed successfully."
-info "Retail App deployed, JMeter installed, images built, manifests applied, rollouts restarted, and database loaded."
-echo "Access the frontend application via the OpenShift route for 'retail-frontend' in the '$NAMESPACE' namespace."
-# End of deploy.sh
+info "Retail App deployed, images built, database loaded, and cluster updated."
