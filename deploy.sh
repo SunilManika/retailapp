@@ -180,6 +180,19 @@ run_cmd "oc login" \
     "oc login --token=$OC_TOKEN --server=$OC_SERVER"
 
 ########################################
+# 8A. CREATE DOCKER REGISTRY SECRET
+########################################
+step "Creating Docker registry secret for image pulls"
+
+run_cmd "Creating dockerhub-secret" \
+    "oc create secret docker-registry dockerhub-secret \
+        --docker-server=docker.io \
+        --docker-username=$DOCKER_USERNAME \
+        --docker-password=$DOCKER_PASSWORD \
+        --docker-email=test123@test.com \
+        -n $NAMESPACE || true"
+
+########################################
 # 9. CREATE NAMESPACE & APPLY SCC
 ########################################
 step "Creating namespace and SCC"
@@ -269,4 +282,5 @@ run_cmd "Executing SQL import" \
 ########################################
 step "Deployment completed successfully."
 info "Retail App deployed, JMeter installed, images built, manifests applied, rollouts restarted, and database loaded."
-echo
+echo "Access the frontend application via the OpenShift route for 'retail-frontend' in the '$NAMESPACE' namespace."
+# End of deploy.sh
