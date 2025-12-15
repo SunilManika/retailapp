@@ -1,2 +1,0 @@
-oc adm policy add-scc-to-user anyuid -z tbb -n tbb
-
