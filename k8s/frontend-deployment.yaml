@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: retail-frontend
+  namespace: tbb  
+  labels:
+    app: retail-frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: retail-frontend
+  template:
+    metadata:
+      labels:
+        app: retail-frontend
+    spec:
+      serviceAccountName: retail
+      containers:
+        - name: frontend
+          image: docker.io/sunilmanika/retail-frontend:1.0.0
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: "50m"      # Low guaranteed CPU for easy saturation
+              memory: "128Mi" # Low memory to show upward trend
+            limits:
+              cpu: "300m"     # Moderate limit to show CPU throttling
+              memory: "512Mi" # Enough to avoid OOM but show growth
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 20
+
