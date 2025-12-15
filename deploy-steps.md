@@ -1,6 +1,5 @@
 # Retail Application Deployment Guide
 
-**File:** `deploy.md`\
 **Purpose:** End-to-end instructions for deploying the Retail Sample App
 to an OpenShift cluster using the automated deployment script.
 
