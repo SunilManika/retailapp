@@ -1,97 +1,223 @@
-# Deployment Steps on IBM Cloud Red Hat OpenShift
+# Retail Application Deployment Guide
 
-Assumptions:
-- You have an OpenShift cluster and `oc` CLI configured.
-- You have `podman` installed and logged in to Docker Hub (`docker.io/sunilmanika`).
-- PostgreSQL storage is available via default StorageClass.
+**File:** `deploy.md`\
+**Purpose:** End-to-end instructions for deploying the Retail Sample App
+to an OpenShift cluster using the automated deployment script.
 
-## 1. Build and Push Images with podman
+------------------------------------------------------------------------
 
-From the project root:
+## 1. Overview
 
-```bash
-# Backend
-cd backend
-podman build -t docker.io/sunilmanika/retail-backend:1.0.0 .
-podman push docker.io/sunilmanika/retail-backend:1.0.0
-cd ..
+This document describes how to execute the deployment script that
+installs prerequisites, builds and pushes container images, logs into
+OpenShift, deploys application manifests, rebuilds frontend assets with
+the dynamic backend route, and loads the PostgreSQL database.
 
-# Frontend
-cd frontend
-podman build -t docker.io/sunilmanika/retail-frontend:1.0.0 .
-podman push docker.io/sunilmanika/retail-frontend:1.0.0
-cd ..
-```
+The deployment script automates the following:
 
-## 2. Create OpenShift Project
+-   Installing unzip, podman, Java 11, OC CLI, and Apache JMeter\
+-   Downloading the Retail App source from GitHub\
+-   Updating image references to use the user-provided Docker Hub
+    account\
+-   Building and pushing backend and frontend container images\
+-   Logging in to OpenShift and preparing the target namespace\
+-   Deploying backend, frontend, PostgreSQL, and Kubernetes manifests\
+-   Rebuilding the frontend with the actual backend route\
+-   Restarting deployments\
+-   Loading database seed data
 
-```bash
-oc new-project retail-demo
-```
+------------------------------------------------------------------------
 
-## 3. Create PostgreSQL Deployment and Service
+## 2. Prerequisites
 
-```bash
-oc apply -f k8s/postgres-deployment.yaml
-oc apply -f k8s/postgres-service.yaml
-```
+### 2.1 Required Access
 
-Wait for the PostgreSQL pod to be `Running`.
+Before running the deployment script, ensure the following:
 
-## 4. Initialize the Database Schema and Seed Data
+  -----------------------------------------------------------------------
+  Requirement                        Description
+  ---------------------------------- ------------------------------------
+  Root access                        Script must be executed as root.
 
-Copy `db/init.sql` into the postgres pod and run it:
+  Docker Hub account                 Username and password/token needed
+                                     for pushing images.
 
-```bash
-# Get postgres pod name
-PG_POD=$(oc get pods -l app=retail-postgres -o jsonpath='{.items[0].metadata.name}')
+  OpenShift access                   `oc login` token and API server
+                                     endpoint.
 
-# Copy SQL file
-oc cp db/init.sql $PG_POD:/tmp/init.sql
+  OpenShift version                  Tested with OpenShift **4.18.x**.
 
-# Exec into pod to run psql
-oc exec -it $PG_POD -- bash -c "psql -U retail_user -d retaildb -f /tmp/init.sql"
-```
+  Internet access                    Required to download tools and
+                                     GitHub source repo.
+  -----------------------------------------------------------------------
 
-This creates tables, products, and ~50 users (user1..user50) with initial password placeholder
-that is transparently migrated to bcrypt hashes on first login.
+------------------------------------------------------------------------
 
-## 5. Create Backend Secrets and Config (Optional but Recommended)
+## 3. Required Inputs
 
-For a quick demo, the manifests already include env vars inline.
-For production, create Secrets/ConfigMaps and reference them from the backend Deployment.
+The script expects **four positional parameters**:
 
-## 6. Deploy Backend and Frontend
+    ./deploy.sh <OC_TOKEN> <OC_SERVER> <DOCKER_USERNAME> <DOCKER_PASSWORD>
 
-```bash
-oc apply -f k8s/backend-deployment.yaml
-oc apply -f k8s/backend-service.yaml
+Where:
 
-oc apply -f k8s/frontend-deployment.yaml
-oc apply -f k8s/frontend-service.yaml
-oc apply -f k8s/frontend-route.yaml
-```
+  Parameter           Description
+  ------------------- ----------------------------------------------
+  `OC_TOKEN`          OpenShift login token (from `oc whoami -t`).
+  `OC_SERVER`         OpenShift API server URL.
+  `DOCKER_USERNAME`   Docker Hub username.
+  `DOCKER_PASSWORD`   Docker Hub password or PAT.
 
-Optionally expose backend API via route:
+Example:
 
-```bash
-oc apply -f k8s/backend-route.yaml
-```
+    ./deploy.sh sha256~xyz https://api.mycluster.openshift.com:6443 mydockeruser mydockerpass
 
-## 7. Get the Frontend URL
+------------------------------------------------------------------------
 
-```bash
-oc get route retail-frontend -o jsonpath='{.spec.host}{"\n"}'
-```
+## 4. Script Workflow Summary
 
-Open the URL in a browser.
+### 4.1 Install Prerequisites
 
-## 8. Login Credentials
+-   Installs unzip, podman, and Java 11\
+-   Installs OpenShift CLI (oc)\
+-   Installs Apache JMeter 5.6.3
 
-Use any of the seeded demo users:
+### 4.2 Download Source Code
 
-- Username: `user1` .. `user50`
-- Password: `Password@123`
+-   Downloads the GitHub repo ZIP\
+-   Extracts into `/root/retailapp-main`
 
-On first successful login, the plaintext password stored in PostgreSQL is migrated
-to a bcrypt hash using bcryptjs in the backend.
+### 4.3 Update Kubernetes YAMLs
+
+The script performs automated replacement of image repository
+references:
+
+    sed -i "s/technologybuildingblocks/<DOCKER_USERNAME>/g" k8s/frontend-deployment.yaml
+    sed -i "s/technologybuildingblocks/<DOCKER_USERNAME>/g" k8s/backend-deployment.yaml
+
+### 4.4 Build and Push Images
+
+Backend:
+
+    podman build -t docker.io/<username>/retail-backend:1.0.0 .
+    podman push docker.io/<username>/retail-backend:1.0.0
+
+Initial frontend build:
+
+    podman build -t docker.io/<username>/retail-frontend:1.0.0 --build-arg VITE_API_BASE_URL=""
+    podman push docker.io/<username>/retail-frontend:1.0.0
+
+### 4.5 OpenShift Login and Namespace Setup
+
+-   Logs into the OpenShift cluster\
+-   Creates Docker registry pull secret\
+-   Applies namespace and SCC\
+-   Deploys Kubernetes manifests under `/k8s`
+
+### 4.6 Rebuild Frontend With Backend Route
+
+Retrieve backend route:
+
+    oc get route -n tbb | grep retail-backend | awk '{print $2}'
+
+Rebuild frontend with:
+
+    --build-arg VITE_API_BASE_URL=https://<backend-route>/api
+
+### 4.7 Restart Deployments
+
+    oc rollout restart deployment/retail-backend -n tbb
+    oc rollout restart deployment/retail-frontend -n tbb
+
+### 4.8 Load Database
+
+-   Copy SQL dump into PostgreSQL pod\
+-   Execute SQL import using psql
+
+------------------------------------------------------------------------
+
+## 5. Running the Deployment Script
+
+### 5.1 Make the script executable
+
+    chmod +x deploy.sh
+
+### 5.2 Execute with required parameters
+
+    ./deploy.sh <OC_TOKEN> <OC_SERVER> <DOCKER_USERNAME> <DOCKER_PASSWORD>
+
+### 5.3 Successful Completion
+
+You should see:
+
+    ---- Deployment completed successfully. ----
+    [INFO] Retail App deployed, images built, database loaded, and cluster updated.
+
+------------------------------------------------------------------------
+
+## 6. Post‑Deployment Validation
+
+### Check pod status
+
+    oc get pods -n tbb
+
+Expected:
+
+  Component         Status
+  ----------------- ---------
+  retail-backend    Running
+  retail-frontend   Running
+  retail-postgres   Running
+
+### Obtain frontend route
+
+    oc get route -n tbb | grep retail-frontend
+
+Open in browser:
+
+    https://<frontend-route>
+
+### Test backend health
+
+    curl https://<backend-route>/api/health
+
+Expected:
+
+    {"status":"UP"}
+
+------------------------------------------------------------------------
+
+## 7. Troubleshooting
+
+### Podman login fails
+
+    podman login docker.io
+
+### PostgreSQL pod not found
+
+    oc get pods -l app=retail-postgres -n tbb
+
+### Frontend cannot reach backend
+
+Verify backend route:
+
+    oc get route -n tbb retail-backend
+
+------------------------------------------------------------------------
+
+## 8. Directory Layout After Script Execution
+
+    /root/retailapp-main/
+    │── backend/
+    │── frontend/
+    │── k8s/
+    │── db/full_dump.sql
+    deploy.sh
+
+------------------------------------------------------------------------
+
+## 9. Notes
+
+-   Script must run on RHEL/CentOS compatible environments.\
+-   Docker Hub rate limits may apply.\
+-   SCC `anyuid` is applied to service account `tbb`.
