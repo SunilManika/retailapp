@@ -215,6 +215,5 @@ Verify backend route:
 
 ## 9. Notes
 
--   Script must run on RHEL/CentOS compatible environments.\
--   Docker Hub rate limits may apply.\
--   SCC `anyuid` is applied to service account `tbb`.
+-   Script must run on RHEL/CentOS compatible environments.
+-   Docker Hub rate limits may apply.
