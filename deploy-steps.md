@@ -14,16 +14,16 @@ the dynamic backend route, and loads the PostgreSQL database.
 
 The deployment script automates the following:
 
--   Installing unzip, podman, Java 11, OC CLI, and Apache JMeter\
--   Downloading the Retail App source from GitHub\
+-   Installing unzip, podman, Java 11, OC CLI, and Apache JMeter.
+-   Downloading the Retail App source from GitHub.
 -   Updating image references to use the user-provided Docker Hub
-    account\
--   Building and pushing backend and frontend container images\
--   Logging in to OpenShift and preparing the target namespace\
--   Deploying backend, frontend, PostgreSQL, and Kubernetes manifests\
--   Rebuilding the frontend with the actual backend route\
--   Restarting deployments\
--   Loading database seed data
+    account
+-   Building and pushing backend and frontend container images.
+-   Logging in to OpenShift and preparing the target namespace.
+-   Deploying backend, frontend, PostgreSQL, and Kubernetes manifests.
+-   Rebuilding the frontend with the actual backend route.
+-   Restarting deployments.
+-   Loading database seed data.
 
 ------------------------------------------------------------------------
 
