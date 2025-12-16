@@ -85,15 +85,16 @@ install_jmeter() {
 
 download_application() {
     step "Downloading application source"
-    cd /root
+    cd ~
     run_cmd "Downloading retailapp ZIP" "wget -q $GITHUB_ZIP_URL -O main.zip"
     run_cmd "Unzipping repo" "unzip -qo main.zip"
 }
 
 update_yaml_images() {
     step "Updating YAMLs with Docker username"
-    sed -i "s/technologybuildingblocks/${DOCKER_USERNAME}/g" k8s/frontend-deployment.yaml
-    sed -i "s/technologybuildingblocks/${DOCKER_USERNAME}/g" k8s/backend-deployment.yaml
+    sed -i "s/technologybuildingblocks/${DOCKER_USERNAME}/g" ~/retailapp-main/k8s//frontend-deployment.yaml
+    sed -i "s/technologybuildingblocks/${DOCKER_USERNAME}/g" ~/retailapp-main/k8s//backend-deployment.yaml
+    sed -i "s/namespace: tbb/namespace: ${NAMESPACE}/g" ~/retailapp-main/k8s/*.yaml
 }
 
 oc_login() {
@@ -168,7 +169,7 @@ restart_deployments() {
 load_database() {
     step "Loading database"
 
-    cd /root/retailapp-main
+    cd ~/retailapp-main
 
     info "Locating PostgreSQL pod..."
     for _ in {1..10}; do
@@ -193,7 +194,7 @@ install_oc_cli
 install_jmeter
 
 download_application
-cd /root/retailapp-main
+cd ~/retailapp-main
 update_yaml_images
 
 run_cmd "Podman login" \
