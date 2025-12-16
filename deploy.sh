@@ -117,14 +117,14 @@ create_docker_secret() {
 
 build_and_push_backend() {
     step "Building backend image"
-    cd backend/
+    cd ~/retailapp-main/backend/
     run_cmd "Build backend" "podman build -t $BACKEND_IMAGE . > /dev/null"
     run_cmd "Push backend"  "podman push $BACKEND_IMAGE > /dev/null"
 }
 
 build_and_push_frontend_initial() {
     step "Building initial frontend image"
-    cd ../frontend/
+    cd ~/retailapp-main/frontend/
     run_cmd "Build frontend (initial)" \
         "podman build -t $FRONTEND_IMAGE --build-arg VITE_API_BASE_URL='' . > /dev/null"
     run_cmd "Push frontend (initial)" "podman push $FRONTEND_IMAGE > /dev/null"
@@ -149,7 +149,7 @@ rebuild_frontend_with_route() {
     info "Backend route: $BACKEND_ROUTE"
 
     step "Rebuilding frontend image with backend route"
-    cd ../frontend/
+    cd ~/retailapp-main/frontend/
     run_cmd "Build frontend (final)" \
         "podman build -t $FRONTEND_IMAGE --build-arg VITE_API_BASE_URL=https://$BACKEND_ROUTE/api . > /dev/null"
     run_cmd "Push frontend (final)" "podman push $FRONTEND_IMAGE > /dev/null"
