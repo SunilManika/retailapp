@@ -48,8 +48,6 @@ Before running the deployment script, ensure the following:
 
   - Internet access                    Required to download tools and
                                      GitHub source repo.
-  -----------------------------------------------------------------------
-
 ------------------------------------------------------------------------
 
 ## 3. Required Inputs
