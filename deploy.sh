@@ -95,6 +95,7 @@ update_yaml_images() {
     sed -i "s/technologybuildingblocks/${DOCKER_USERNAME}/g" ~/retailapp-main/k8s//frontend-deployment.yaml
     sed -i "s/technologybuildingblocks/${DOCKER_USERNAME}/g" ~/retailapp-main/k8s//backend-deployment.yaml
     sed -i "s/namespace: tbb/namespace: ${NAMESPACE}/g" ~/retailapp-main/k8s/*.yaml
+    sed -i "s/name: tbb/name: $NAMESPACE/g" ~/retailapp-main/k8s/namespace.yaml
 }
 
 oc_login() {
