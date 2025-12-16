@@ -35,7 +35,7 @@ Before running the deployment script, ensure the following:
 
   -----------------------------------------------------------------------
   Requirement                        Description
-  ---------------------------------- ------------------------------------
+
   - Root access                        Script must be executed as root.
 
   - Docker Hub account                 Username and password/token needed
