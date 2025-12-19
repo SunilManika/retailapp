@@ -1,0 +1,10 @@
+automation filter=lfs diff=lfs merge=lfs -text
+frontend filter=lfs diff=lfs merge=lfs -text
+jmeter filter=lfs diff=lfs merge=lfs -text
+k8s filter=lfs diff=lfs merge=lfs -text
+LICENSE filter=lfs diff=lfs merge=lfs -text
+postgresql filter=lfs diff=lfs merge=lfs -text
+README.md filter=lfs diff=lfs merge=lfs -text
+backend filter=lfs diff=lfs merge=lfs -text
+deploy-steps.md filter=lfs diff=lfs merge=lfs -text
+deploy.sh filter=lfs diff=lfs merge=lfs -text
