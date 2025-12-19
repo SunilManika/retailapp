@@ -1,0 +1,25 @@
+---
+- name: Create terraform.tfvars
+  copy:
+    dest: "{{ terraform_dir }}/terraform/deploy_retail_manifests/terraform.tfvars"
+    mode: "0600"
+    content: |
+      namespace   = "{{ namespace }}"
+      ocp_server  = "{{ ocp_server }}"
+      ocp_token   = "{{ ocp_token }}"
+
+- name: Terraform Init
+  command: terraform init
+  args:
+    chdir: "{{ terraform_dir }}/terraform/deploy_retail_manifests"
+
+- name: Terraform Validate
+  command: terraform validate
+  args:
+    chdir: "{{ terraform_dir }}/terraform/deploy_retail_manifests"
+
+- name: Terraform Apply
+  command: terraform apply -auto-approve
+  args:
+    chdir: "{{ terraform_dir }}/terraform/deploy_retail_manifests"
+
