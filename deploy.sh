@@ -183,7 +183,7 @@ load_database() {
     info "PostgreSQL pod: $POD"
 
     run_cmd "Copy SQL dump" \
-        "oc cp db/full_dump.sql -n $NAMESPACE $POD:/tmp/full_dump.sql"
+        "oc cp postgres/full_dump.sql -n $NAMESPACE $POD:/tmp/full_dump.sql"
 
     run_cmd "Import database" \
         "oc exec -n $NAMESPACE $POD -- bash -c 'psql -U retail_user -d retaildb < /tmp/full_dump.sql'"
