@@ -1,4 +1,4 @@
-FROM postgres:16-alpine
+FROM docker.io/library/postgres:16-alpine
 
 # Copy the SQL dump into the image
 COPY full_dump.sql /tmp/full_dump.sql
