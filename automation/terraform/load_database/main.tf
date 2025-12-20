@@ -7,8 +7,8 @@ terraform {
   }
 }
 
-
 resource "null_resource" "load_database" {
+
   triggers = {
     namespace = var.namespace
   }
@@ -17,22 +17,28 @@ resource "null_resource" "load_database" {
     command = <<-EOT
       set -e
 
-      echo "Locating PostgreSQL pod..."
+      echo "Waiting for PostgreSQL pod to be Ready..."
+      oc wait --for=condition=Ready pod \
+        -l app=retail-postgres \
+        -n ${var.namespace} \
+        --timeout=300s
+
       POD=$(oc get pod -n ${var.namespace} -l app=retail-postgres -o jsonpath='{.items[0].metadata.name}')
-
-      if [ -z "$POD" ]; then
-        echo "PostgreSQL pod not found"
-        exit 1
-      fi
-
       echo "Using pod: $POD"
-      echo "Importing database..."
+
+      echo "Waiting for PostgreSQL to accept connections..."
+      until oc exec -n ${var.namespace} $POD -- \
+        pg_isready -h localhost -U retail_user -d retaildb; do
+        echo "PostgreSQL not ready yet, retrying in 5s..."
+        sleep 5
+      done
+
+      echo "PostgreSQL is ready. Importing database..."
 
       oc exec -n ${var.namespace} $POD -- \
-        psql -U retail_user -d retaildb -f /tmp/full_dump.sql
+        psql -h localhost -U retail_user -d retaildb -f /tmp/full_dump.sql
 
       echo "Database load completed successfully"
     EOT
   }
 }
-

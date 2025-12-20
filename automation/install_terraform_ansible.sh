@@ -87,8 +87,7 @@ install_ansible() {
     apt-get install -y ansible
 
   elif [[ "$ID" == "rhel" || "$ID_LIKE" == *"rhel"* || "$ID" == "rocky" || "$ID" == "almalinux" ]]; then
-    yum install -y epel-release
-    yum install -y ansible
+    dnf install ansible-core -y
 
   elif [[ "$ID" == "amzn" ]]; then
     amazon-linux-extras enable ansible2
