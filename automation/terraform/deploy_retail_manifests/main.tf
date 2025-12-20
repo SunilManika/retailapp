@@ -27,5 +27,10 @@ resource "kubernetes_manifest" "retail" {
       }
     )
   )
+
+  field_manager {
+    name            = "terraform"
+    force_conflicts = false
+  }
 }
 

@@ -6,7 +6,6 @@ metadata:
   labels:
     app: retail-frontend
 spec:
-  replicas: 2
   selector:
     matchLabels:
       app: retail-frontend

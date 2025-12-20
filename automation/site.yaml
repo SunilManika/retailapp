@@ -3,10 +3,10 @@
   gather_facts: false
 
   vars:
-    namespace: retail-automation-ansible
+    namespace: retail-automation-terraform1
     
     app_dir: /opt/retailapp
-    terraform_dir: /opt/retailapp/automation
+    terraform_dir: /media/gold/gold
 
     ocp_server: "{{ lookup('env','OCP_SERVER') }}"
     ocp_token: "{{ lookup('env','OCP_TOKEN') }}"
@@ -33,6 +33,9 @@
   - name: OpenShift login
     include_role:
       name: oc_login
+  - name: Podman login
+    include_role:
+      name: podman_login
   - name: Create Docker registry secret
     include_role:
       name: terraform_create_docker_secret
@@ -48,6 +51,9 @@
   - name: Prepare namespace
     include_role:
       name: terraform_prepare_namespace
+  - name: Prepare ServiceAccount
+    include_role:
+      name: prepare_serviceaccount
   - name: Deploy retail manifests
     include_role:
       name: terraform_deploy_retail_manifests

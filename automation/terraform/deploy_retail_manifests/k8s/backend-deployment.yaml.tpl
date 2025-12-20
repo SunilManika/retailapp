@@ -6,7 +6,6 @@ metadata:
   labels:
     app: retail-backend
 spec:
-  replicas: 2
   selector:
     matchLabels:
       app: retail-backend
