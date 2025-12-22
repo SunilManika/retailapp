@@ -5,6 +5,7 @@
     mode: "0600"
     content: |
       namespace   = "{{ namespace }}"
+      docker_username  = "{{ docker_username }}"
       ocp_server  = "{{ ocp_server }}"
       ocp_token   = "{{ ocp_token }}"
 

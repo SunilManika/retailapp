@@ -14,3 +14,7 @@ variable "ocp_token" {
   sensitive   = true
 }
 
+variable "docker_username" {
+  description = "Docker Hub username to be used in image references"
+  type        = string
+}

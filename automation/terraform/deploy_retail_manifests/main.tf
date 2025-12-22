@@ -23,7 +23,8 @@ resource "kubernetes_manifest" "retail" {
     templatefile(
       "${path.module}/k8s/${each.value}",
       {
-        namespace = var.namespace
+        namespace       = var.namespace
+        docker_username = var.docker_username
       }
     )
   )
@@ -33,4 +34,3 @@ resource "kubernetes_manifest" "retail" {
     force_conflicts = false
   }
 }
-

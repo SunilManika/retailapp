@@ -6,6 +6,7 @@ metadata:
   labels:
     app: retail-frontend
 spec:
+  replicas: 2
   selector:
     matchLabels:
       app: retail-frontend
@@ -19,7 +20,7 @@ spec:
         - name: dockerhub-secret
       containers:
         - name: frontend
-          image: docker.io/technologybuildingblocks/retail-frontend:1.0.0
+          image: docker.io/${docker_username}/retail-frontend:1.0.0
           imagePullPolicy: Always
           ports:
             - containerPort: 80

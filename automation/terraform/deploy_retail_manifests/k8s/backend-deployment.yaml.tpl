@@ -6,6 +6,7 @@ metadata:
   labels:
     app: retail-backend
 spec:
+  replicas: 2
   selector:
     matchLabels:
       app: retail-backend
@@ -14,11 +15,12 @@ spec:
       labels:
         app: retail-backend
     spec:
+      serviceAccountName: retail
       imagePullSecrets:
         - name: dockerhub-secret
       containers:
         - name: backend
-          image: docker.io/technologybuildingblocks/retail-backend:1.0.0
+          image: docker.io/${docker_username}/retail-backend:1.0.0
           imagePullPolicy: Always
           env:
             - name: DB_HOST

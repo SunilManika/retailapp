@@ -16,9 +16,11 @@ spec:
         app: retail-postgres
     spec:
       serviceAccountName: retail
+      imagePullSecrets:
+        - name: dockerhub-secret
       containers:
         - name: postgres
-          image: docker.io/technologybuildingblocks/retail-postgresql:1.0.0
+          image: docker.io/${docker_username}/retail-postgresql:1.0.0
           env:
             - name: POSTGRES_DB
               value: retaildb
