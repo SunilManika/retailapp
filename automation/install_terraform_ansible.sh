@@ -1,109 +1,129 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+info() {
+  echo "[INFO] $1"
+}
+
+success() {
+  echo "[OK]   $1"
+}
+
+error() {
+  echo "[ERROR] $1"
+  exit 1
+}
+
 echo "==========================================="
 echo " Installing Terraform and Ansible"
 echo "==========================================="
 
-# Must run as root
 if [[ "$EUID" -ne 0 ]]; then
-  echo "ERROR: Please run as root or with sudo"
-  exit 1
+  error "Please run as root or with sudo"
 fi
 
-# Detect OS
 if [[ -f /etc/os-release ]]; then
   . /etc/os-release
 else
-  echo "ERROR: Cannot detect OS"
-  exit 1
+  error "Unable to detect operating system"
 fi
 
-echo "Detected OS: $NAME"
+info "Detected OS: ${NAME}"
 
-############################################
-# Install prerequisites
-############################################
 install_prereqs() {
+  info "Installing system prerequisites..."
+
   if [[ "$ID" == "ubuntu" || "$ID_LIKE" == *"debian"* ]]; then
-    apt-get update -y
+    apt-get update -y >/dev/null 2>&1
     apt-get install -y \
-      curl \
-      wget \
-      unzip \
-      gnupg \
-      software-properties-common \
-      python3 \
-      python3-pip
+      curl wget unzip gnupg software-properties-common \
+      python3 python3-pip >/dev/null 2>&1
 
   elif [[ "$ID" == "rhel" || "$ID_LIKE" == *"rhel"* || "$ID" == "rocky" || "$ID" == "almalinux" ]]; then
     yum install -y \
-      yum-utils \
-      curl \
-      wget \
-      unzip \
-      python3 \
-      python3-pip
+      yum-utils curl wget unzip \
+      python3 python3-pip >/dev/null 2>&1
 
   elif [[ "$ID" == "amzn" ]]; then
     yum install -y \
-      yum-utils \
-      curl \
-      wget \
-      unzip \
-      python3 \
-      python3-pip
+      yum-utils curl wget unzip \
+      python3 python3-pip >/dev/null 2>&1
   else
-    echo "ERROR: Unsupported OS"
-    exit 1
+    error "Unsupported OS: $ID"
   fi
+
+  success "Prerequisites installed"
 }
 
-############################################
-# Install Terraform
-############################################
+ensure_python() {
+  info "Validating Python runtime for Ansible..."
+
+  if ! command -v python3 >/dev/null 2>&1; then
+    error "python3 is required but not found"
+  fi
+
+  if [[ ! -x /usr/bin/python ]]; then
+    ln -sf /usr/bin/python3 /usr/bin/python
+    info "Created /usr/bin/python symlink to python3"
+  fi
+
+  success "Python runtime ready"
+}
+
 install_terraform() {
-  echo "Installing Terraform..."
+  info "Installing Terraform..."
 
   TERRAFORM_VERSION="1.8.5"
+  TMP_DIR="/tmp/terraform-install"
 
-  cd /tmp
+  mkdir -p "$TMP_DIR"
+  cd "$TMP_DIR"
+
+  info "Downloading Terraform ${TERRAFORM_VERSION}"
   wget -q https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip
-  unzip -o terraform_${TERRAFORM_VERSION}_linux_amd64.zip
+
+  info "Extracting Terraform binary"
+  unzip -oq terraform_${TERRAFORM_VERSION}_linux_amd64.zip
+
   mv terraform /usr/local/bin/
   chmod +x /usr/local/bin/terraform
 
-  terraform version
-}
-
-############################################
-# Install Ansible
-############################################
-install_ansible() {
-  echo "Installing Ansible..."
-
-  if [[ "$ID" == "ubuntu" || "$ID_LIKE" == *"debian"* ]]; then
-    apt-add-repository --yes --update ppa:ansible/ansible
-    apt-get install -y ansible
-
-  elif [[ "$ID" == "rhel" || "$ID_LIKE" == *"rhel"* || "$ID" == "rocky" || "$ID" == "almalinux" ]]; then
-    dnf install ansible-core -y
-
-  elif [[ "$ID" == "amzn" ]]; then
-    amazon-linux-extras enable ansible2
-    yum install -y ansible
+  if command -v terraform >/dev/null 2>&1; then
+    success "Terraform installed successfully"
+    terraform version | head -n 1
+  else
+    error "Terraform installation failed"
   fi
 
-  ansible --version
+  rm -rf "$TMP_DIR"
 }
 
-############################################
-# Execute
-############################################
+install_ansible() {
+  info "Installing Ansible..."
+
+  if [[ "$ID" == "ubuntu" || "$ID_LIKE" == *"debian"* ]]; then
+    add-apt-repository --yes ppa:ansible/ansible >/dev/null 2>&1
+    apt-get update -y >/dev/null 2>&1
+    apt-get install -y ansible >/dev/null 2>&1
+
+  elif [[ "$ID" == "rhel" || "$ID_LIKE" == *"rhel"* || "$ID" == "rocky" || "$ID" == "almalinux" ]]; then
+    dnf install -y ansible-core >/dev/null 2>&1
+
+  elif [[ "$ID" == "amzn" ]]; then
+    amazon-linux-extras enable ansible2 >/dev/null 2>&1
+    yum install -y ansible >/dev/null 2>&1
+  else
+    error "Unsupported OS for Ansible installation"
+  fi
+
+  ansible --version 2>/dev/null | head -n 1 || info "Ansible installed successfully"
+}
+
 install_prereqs
 install_terraform
+ensure_python
 install_ansible
 
 echo "==========================================="
-echo " Terraform and Ansible installation done"
+success "Terraform and Ansible installation completed"
 echo "==========================================="
