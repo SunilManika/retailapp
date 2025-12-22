@@ -14,6 +14,11 @@
     docker_username: "{{ lookup('env', 'DOCKER_USERNAME') }}"
     docker_password: "{{ lookup('env', 'DOCKER_PASSWORD') }}"
 
+    # PostgreSQL credentials
+    postgres_db: retaildb
+    postgres_user: retail_user
+    postgres_password: retail_password
+
   tasks:
   - name: Install prerequisites
     include_role:

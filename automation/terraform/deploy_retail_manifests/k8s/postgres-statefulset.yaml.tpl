@@ -3,6 +3,8 @@ kind: StatefulSet
 metadata:
   name: retail-postgres
   namespace: ${namespace}
+  labels:
+    app: retail-postgres
 spec:
   serviceName: retail-postgres
   replicas: 1
@@ -22,14 +24,14 @@ spec:
           image: docker.io/${docker_username}/retail-postgresql:1.0.0
           imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 5432
-              name: postgres
+            - name: postgres
+              containerPort: 5432
           envFrom:
             - secretRef:
                 name: retail-postgres-secret
           env:
             - name: PGDATA
-              value: /var/lib/postgresql/data
+              value: /var/lib/postgresql/data/pgdata
           resources:
             requests:
               cpu: "100m"
@@ -48,6 +50,7 @@ spec:
                 - pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
             initialDelaySeconds: 15
             periodSeconds: 10
+            timeoutSeconds: 5
           livenessProbe:
             exec:
               command:
@@ -56,6 +59,7 @@ spec:
                 - pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
             initialDelaySeconds: 30
             periodSeconds: 20
+            timeoutSeconds: 5
   volumeClaimTemplates:
     - metadata:
         name: postgres-data
