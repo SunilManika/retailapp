@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: retail-postgres
-  namespace: ${namespace}
+  namespace: tbb
   labels:
     app: retail-postgres
 spec:
