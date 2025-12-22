@@ -18,6 +18,8 @@ spec:
       serviceAccountName: retail
       imagePullSecrets:
         - name: dockerhub-secret
+      securityContext:
+        fsGroup: 26
       containers:
         - name: postgres
           image: docker.io/${docker_username}/retail-postgresql:1.0.0
@@ -32,18 +34,18 @@ spec:
               value: /var/lib/postgresql/data/pgdata
           resources:
             requests:
-              cpu: "100m"        # Small guaranteed CPU → DB will spike under load
-              memory: "256Mi"    # Enough to run but low enough to show growth
+              cpu: "100m"
+              memory: "256Mi"
             limits:
-              cpu: "500m"        # Limits CPU so throttling is visible
-              memory: "1Gi"      # Safe upper limit to avoid DB OOMKilled
+              cpu: "500m"
+              memory: "1Gi"
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql/data
           ports:
             - containerPort: 5432
+
       volumes:
         - name: data
           persistentVolumeClaim:
             claimName: retail-postgres-pvc
-
