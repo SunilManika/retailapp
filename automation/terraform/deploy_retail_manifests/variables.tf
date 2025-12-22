@@ -18,3 +18,17 @@ variable "docker_username" {
   description = "Docker Hub username to be used in image references"
   type        = string
 }
+
+variable "postgres_db" {
+  type = string
+}
+
+variable "postgres_user" {
+  type = string
+}
+
+variable "postgres_password" {
+  type      = string
+  sensitive = true
+}
+

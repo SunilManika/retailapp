@@ -4,7 +4,7 @@ metadata:
   name: retail-postgres-secret
   namespace: ${namespace}
 type: Opaque
-stringData:
-  POSTGRES_DB: retaildb
-  POSTGRES_USER: retail_user
-  POSTGRES_PASSWORD: retail_password
+data:
+  POSTGRES_DB: ${postgres_db}
+  POSTGRES_USER: ${postgres_user}
+  POSTGRES_PASSWORD: ${postgres_password}

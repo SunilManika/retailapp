@@ -25,6 +25,10 @@ resource "kubernetes_manifest" "retail" {
       {
         namespace       = var.namespace
         docker_username = var.docker_username
+
+        postgres_db        = base64encode(var.postgres_db)
+        postgres_user      = base64encode(var.postgres_user)
+        postgres_password  = base64encode(var.postgres_password)
       }
     )
   )
