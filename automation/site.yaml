@@ -3,10 +3,10 @@
   gather_facts: false
 
   vars:
-    namespace: retail-automation-terraform1
+    namespace: retail-automation
     
     app_dir: /opt/retailapp
-    terraform_dir: /media/gold/gold
+    terraform_dir: /root/retailapp-main/automation
 
     ocp_server: "{{ lookup('env','OCP_SERVER') }}"
     ocp_token: "{{ lookup('env','OCP_TOKEN') }}"
