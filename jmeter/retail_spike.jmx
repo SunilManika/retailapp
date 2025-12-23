@@ -62,7 +62,7 @@
         <!-- ===================== CONFIG ELEMENTS ===================== -->
         <!-- CSV: username,password (no header row in file) -->
         <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="CSV_Users" enabled="true">
-		<stringProp name="filename">/media/retail-jmeter/spike/retail/users.csv</stringProp>
+		<stringProp name="filename">users.csv</stringProp>
           <stringProp name="fileEncoding"></stringProp>
           <stringProp name="variableNames">username,password</stringProp>
           <stringProp name="delimiter">,</stringProp>
